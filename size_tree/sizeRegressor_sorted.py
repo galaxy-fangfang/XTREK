@@ -26,8 +26,8 @@ def H_func(w, n, N):
     y = H(N - n) + (N-n-2)*w[n]
     return y
 
-def weighted_kendall(rhf_scores, score_per_tree):
-    tau, p_value = stats.weightedtau(rhf_scores, score_per_tree, rank=None)
+def weighted_kendall(anomaly_scores, score_per_tree):
+    tau, p_value = stats.weightedtau(anomaly_scores, score_per_tree, rank=None)
     return tau
 
 def weighted_kendall_my(x, y, pointer, rank=None, weigher=None, tot=None, u=None, x_sorted=True, y_sorted=True):
@@ -316,13 +316,13 @@ def get_best_split(y, X, low_bound, total_size, epslon=0.1):
                 concat_dec = np.concatenate((right_y_sorted, left_y_sorted), axis=None)
                 concat_inc = np.concatenate((left_y_sorted, right_y_sorted), axis=None)
 
-                k_dec, tot, u, v_dec, t_dec, exchange_dec, weights_rhf = weighted_kendall_my(y_inc, concat_dec, right_size, tot=tot, u=u)
-                k_inc, tot, u, v_inc, t_inc, exchange_inc, weights_rhf = weighted_kendall_my(y_inc, concat_inc, left_size, tot=tot, u=u)
+                k_dec, tot, u, v_dec, t_dec, exchange_dec, weights_ori = weighted_kendall_my(y_inc, concat_dec, right_size, tot=tot, u=u)
+                k_inc, tot, u, v_inc, t_inc, exchange_inc, weights_ori = weighted_kendall_my(y_inc, concat_inc, left_size, tot=tot, u=u)
 
-                weights_rhf_left = weights_rhf[:left_size]
-                weights_rhf_right = weights_rhf[left_size:]
-                weights_rhf_left_1 = weights_rhf[:right_size]
-                weights_rhf_right_1 = weights_rhf[right_size:]
+                weights_ori_left = weights_ori[:left_size]
+                weights_ori_right = weights_ori[left_size:]
+                weights_ori_left_1 = weights_ori[:right_size]
+                weights_ori_right_1 = weights_ori[right_size:]
 
             else:
                 insert_item = right_y.popleft()
@@ -331,28 +331,28 @@ def get_best_split(y, X, low_bound, total_size, epslon=0.1):
                 _ = right_y_sorted.pop(original_index)
 
                 #exchange for left to right
-                insert_item_weight_old_inc = weights_rhf_right[original_index]
-                insert_item_weight_new_inc = weights_rhf_left[insert_index-1 if insert_index == j else insert_index]
+                insert_item_weight_old_inc = weights_ori_right[original_index]
+                insert_item_weight_new_inc = weights_ori_left[insert_index-1 if insert_index == j else insert_index]
 
-                left_exchange_delta = (j - insert_index) * insert_item_weight_old_inc + weights_rhf_left[insert_index : j].sum()
-                right_exchange_delta = insert_item_weight_new_inc * (original_index) + weights_rhf_right[: original_index].sum()
+                left_exchange_delta = (j - insert_index) * insert_item_weight_old_inc + weights_ori_left[insert_index : j].sum()
+                right_exchange_delta = insert_item_weight_new_inc * (original_index) + weights_ori_right[: original_index].sum()
 
                 exchange_inc = exchange_inc - left_exchange_delta  + right_exchange_delta
 
                 #exchange for right to left
-                insert_item_weight_old_dec = weights_rhf_left_1[original_index]
-                insert_item_weight_new_dec = weights_rhf_right_1[insert_index-1 if insert_index == j else insert_index]
+                insert_item_weight_old_dec = weights_ori_left_1[original_index]
+                insert_item_weight_new_dec = weights_ori_right_1[insert_index-1 if insert_index == j else insert_index]
 
-                left_exchange_delta = (n_samples - j - original_index) * insert_item_weight_new_dec + weights_rhf_left_1[original_index : n_samples - j].sum()
-                right_exchange_delta = insert_item_weight_old_dec * (insert_index) + weights_rhf_right_1[: insert_index].sum()
+                left_exchange_delta = (n_samples - j - original_index) * insert_item_weight_new_dec + weights_ori_left_1[original_index : n_samples - j].sum()
+                right_exchange_delta = insert_item_weight_old_dec * (insert_index) + weights_ori_right_1[: insert_index].sum()
 
                 exchange_dec = exchange_dec + left_exchange_delta  - right_exchange_delta
 
 
-                weights_rhf_right = np.concatenate((weights_rhf_right[:original_index], weights_rhf_right[original_index+1:]), axis=None)
-                weights_rhf_left_1 = np.concatenate((weights_rhf_left_1[:original_index], weights_rhf_left_1[original_index+1:]), axis=None)
-                weights_rhf_left = np.concatenate((weights_rhf_left[:insert_index], insert_item_weight_new_inc, weights_rhf_left[insert_index:]), axis=None)
-                weights_rhf_right_1 = np.concatenate((weights_rhf_right_1[:insert_index], insert_item_weight_new_dec, weights_rhf_right_1[insert_index:]), axis=None)
+                weights_ori_right = np.concatenate((weights_ori_right[:original_index], weights_ori_right[original_index+1:]), axis=None)
+                weights_ori_left_1 = np.concatenate((weights_ori_left_1[:original_index], weights_ori_left_1[original_index+1:]), axis=None)
+                weights_ori_left = np.concatenate((weights_ori_left[:insert_index], insert_item_weight_new_inc, weights_ori_left[insert_index:]), axis=None)
+                weights_ori_right_1 = np.concatenate((weights_ori_right_1[:insert_index], insert_item_weight_new_dec, weights_ori_right_1[insert_index:]), axis=None)
                 left_y_sorted.add(insert_item)
 
                 left_size = j+1
@@ -379,7 +379,7 @@ def get_best_split(y, X, low_bound, total_size, epslon=0.1):
                     # weigh joint ties
                     first = 0
                     t_star = 0
-                    w = weights_rhf[first]
+                    w = weights_ori[first]
                     s = w
 
                     for ii in range(1, n_samples):
@@ -388,14 +388,14 @@ def get_best_split(y, X, low_bound, total_size, epslon=0.1):
                             first = ii
                             s = 0
 
-                        w = weights_rhf[ii]
+                        w = weights_ori[ii]
                         s += w
                     t_star += s * (n_samples - first - 1)
 
                     # weigh ties in y_inc
                     first = 0
                     u_star = 0
-                    w = weights_rhf[first]
+                    w = weights_ori[first]
                     s = w
                     tie_star = {}
                     tie_l = 1
@@ -410,7 +410,7 @@ def get_best_split(y, X, low_bound, total_size, epslon=0.1):
                             s = 0
 
                         tie_l += 1
-                        w = weights_rhf[ii]
+                        w = weights_ori[ii]
                         s += w
 
                     u_star += s * (n_samples - first - 1)
