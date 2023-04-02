@@ -367,7 +367,6 @@ def get_best_split(y, X, low_bound, total_size, epslon=0.1):
             if left_size < right_size and  k_dec > k_inc and left_size > low_bound or left_size > right_size and k_dec <= k_inc and right_size > low_bound:
                 if left_size_pre_star == 0:
                     # Getting the left and right scores
-                    # RHF score
                     left_score = [-1 * np.log(left_size / total_size)] * left_size
                     right_score = [-1 * np.log(right_size / total_size)] * right_size
 
