@@ -7,10 +7,14 @@ from sklearn.metrics import average_precision_score
 from sklearn.ensemble import IsolationForest
 from size_tree.sizeRegressor_sorted import *
 from sklearn.tree import DecisionTreeRegressor
+import argparse
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', type=str, default='kdd_other')
+    args = parser.parse_args()
     print('Using incremental algorithm!!!')
-    dataset = 'kdd_other'
+    dataset = args.dataset
     dataset_path = os.path.join('./datasets/', dataset)
     df = pd.read_csv(dataset_path, header=0)
     y = df["label"]
@@ -43,7 +47,7 @@ if __name__ == '__main__':
         reg_scores = explainer.predict(X)
         reg_ap[i] = average_precision_score(y,reg_scores)
 
-    print('IF ap: %.3f, Our ap: %.3f, CART ap: %.3f, time per run: %.3f s'%(black_ap.mean(), reg_ap.mean(), size_ap.mean(), counttime/10))
+    print('IF ap: %.3f, Our ap: %.3f, CART ap: %.3f, time per run: %.3f s'%(black_ap.mean(),  size_ap.mean(), reg_ap.mean(),counttime/10))
 
 
 
