@@ -1,2 +1,2 @@
 # XTREK
-`python experiments_sizetree.py`
+`python experiments_accurate.py`
