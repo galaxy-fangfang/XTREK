@@ -6,7 +6,6 @@ from scipy.stats import kurtosis
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-from sklearn.metrics import average_precision_score, mean_squared_error
 from sortedcontainers import SortedList
 from collections import deque
 import math
@@ -136,6 +135,38 @@ def weighted_kendall_my(x, y, pointer, rank=None, weigher=None, tot=None, u=None
 
         perm[i:i+length0-j] = perm[j:length0]
         perm[0:i] = temp[0:i]
+    
+
+    def weigh(offset, length):
+        ### merge sort
+        if length == 1:
+            return weigher(rank[perm[offset]])
+        length0 = length // 2
+        length1 = length - length0
+        middle = offset + length0
+        residual = weigh(offset, length0)
+        weight = weigh(middle, length1) + residual
+        if y[perm[middle - 1]] < y[perm[middle]]:
+            return weight
+
+        # merging
+        i = j = k = 0 # j: left, k: right
+
+        while j < length0 and k < length1:
+            if y[perm[offset + j]] <= y[perm[middle + k]]:
+                temp[i] = perm[offset + j]
+                residual -= weigher(rank[temp[i]])
+                j += 1
+            else:
+                temp[i] = perm[middle + k]
+                exchanges_weight[0] += weigher(rank[temp[i]]) * (
+                    length0 - j) + residual
+                k += 1
+            i += 1
+
+        perm[offset+i:offset+i+length0-j] = perm[offset+j:offset+length0]
+        perm[offset:offset+i] = temp[0:i]
+        return weight
 
     # weigh discordances
     if y_sorted:
@@ -218,8 +249,8 @@ def get_best_split(y, X, low_bound, total_size):
 
     # weights for kendall tau
     N_data = n_samples
-    weights_bi = np.array([1/(N_data-n) for n in range(N_data)])
-    sum_weights_bi = weights_bi.sum()
+    weights_my = np.array([1/(N_data-n) for n in range(N_data)])
+    sum_weights_my = weights_my.sum()
 
     for i in range(d):
         feature = i
@@ -254,9 +285,6 @@ def get_best_split(y, X, low_bound, total_size):
                 break
             value = X_i_sorted[j] / 2.0 + X_i_sorted[j+1] / 2.0
 
-            # step = n_samples
-            # if step==0 or j % step == 0:
-                
             if left_size_pre== 0:
                 # sorted container
                 insert_item = right_y.popleft()
@@ -315,7 +343,7 @@ def get_best_split(y, X, low_bound, total_size):
                     continue
                 k_inc = con_minus_dis_inc / n_minus_tie_inc
                 k_dec = con_minus_dis_dec / n_minus_tie_dec
-                
+            
             if left_size < right_size and  k_dec > k_inc and left_size > low_bound or left_size > right_size and k_dec <= k_inc and right_size > low_bound:
                 if left_size_pre_star == 0:
                     # Getting the left and right scores
@@ -374,18 +402,18 @@ def get_best_split(y, X, low_bound, total_size):
                     # weigh discordances
                     exchange_bi = 0
                     if left_size < right_size: # left_score > right_score
-                        sum1 = sum([H_func(weights_bi, ind, N_data) for ind in left_index])
-                        sum2 = weights_bi[left_index].sum()
+                        sum1 = sum([H_func(weights_rhf, ind, N_data) for ind in left_index])
+                        sum2 = weights_rhf[left_index].sum()
                         exchange_bi = sum1 - (left_size-1)*sum2
                     else:
-                        sum1 = sum([H_func(weights_bi, ind, N_data) for ind in right_index])
-                        sum2 = weights_bi[right_index].sum()
+                        sum1 = sum([H_func(weights_rhf, ind, N_data) for ind in right_index])
+                        sum2 = weights_rhf[right_index].sum()
                         exchange_bi = sum1 - (right_size-1)*sum2
                         bFirst = False
 
                     # weigh ties in predict_concat[xx]
-                    sum_v_2 =  weights_bi[right_index].sum()
-                    v_star = sum_weights_bi*(left_size-1) + sum_v_2*(N_data-2*left_size)
+                    sum_v_2 =  weights_rhf[right_index].sum()
+                    v_star = sum_weights_my*(left_size-1) + sum_v_2*(N_data-2*left_size)
 
                 else:
                     ### check the exchange value
@@ -396,8 +424,8 @@ def get_best_split(y, X, low_bound, total_size):
                     right_index = xx_rank[left_size:]
 
                     # calculate v_star by increments
-                    del_v_1 = weights_bi[delta_right_index].sum()
-                    del_v = sum_weights_bi*N_shift \
+                    del_v_1 = weights_rhf[delta_right_index].sum()
+                    del_v = sum_weights_my*N_shift \
                             -2*N_shift*sum_v_2 \
                             -del_v_1*(N_data-2*left_size)
 
@@ -406,7 +434,7 @@ def get_best_split(y, X, low_bound, total_size):
 
                     if left_size < right_size: # left_score > right_score
                         sum2_add = del_v_1
-                        delta1 = sum([H_func(weights_bi, ind, N_data) for ind in delta_right_index])
+                        delta1 = sum([H_func(weights_rhf, ind, N_data) for ind in delta_right_index])
                         delta2 = (left_size-1)*sum2_add + \
                                 N_shift * sum2
                         sum2 = sum2 + sum2_add
@@ -415,14 +443,14 @@ def get_best_split(y, X, low_bound, total_size):
                     else:# left_score < right_score
                         if bFirst == False:
                             sum2_add = del_v_1
-                            delta1 = sum([H_func(weights_bi, ind, N_data) for ind in delta_right_index])
+                            delta1 = sum([H_func(weights_rhf, ind, N_data) for ind in delta_right_index])
                             delta2 = (right_size-1)*sum2_add + \
                                     N_shift * sum2
                             sum2 = sum2 - sum2_add
                             exchange_bi -= (delta1-delta2)
                         else:
-                            sum1 = sum([H_func(weights_bi, ind, N_data) for ind in right_index])
-                            sum2 = weights_bi[right_index].sum()
+                            sum1 = sum([H_func(weights_rhf, ind, N_data) for ind in right_index])
+                            sum2 = weights_rhf[right_index].sum()
                             exchange_bi = sum1 - (right_size-1)*sum2
                             bFirst = False
                 kendall_split = ((tot_star - (u_star + v_star - t_star)) - 2. * exchange_bi) / np.sqrt(tot_star - u_star) / np.sqrt(tot_star - v_star)
@@ -489,7 +517,6 @@ class SizeBasedRegressionTree(object):
         self.all_nodes = [] # all node index
         self.leaf_gt = [] # leaf node gt
 
-
     def generate_node(self, y, X, depth=None, parent=None):
         self.N += 1
 
@@ -518,7 +545,6 @@ class SizeBasedRegressionTree(object):
         else:
             node.label = 1/len(y)
         self.reg_scores[node.data.index] = node.label
-
 
     def build(self, low_bound_layer):
         """
@@ -592,7 +618,6 @@ class SizeBasedRegressionTree(object):
         else:
             return
 
-
     def fit(self, y, X):
         """
         Build tree function: generates the root node and successively builds the tree recursively
@@ -609,7 +634,6 @@ class SizeBasedRegressionTree(object):
 
         self.queue1.append(self.tree_)
         self.build(0)
-        
 
     def predict(self, mySample):
         current_node = self.tree_
