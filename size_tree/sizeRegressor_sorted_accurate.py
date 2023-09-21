@@ -6,12 +6,10 @@ from scipy.stats import kurtosis
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-# import matplotlib.pyplot as plt
 from sklearn.metrics import average_precision_score, mean_squared_error
 from rhf import RHF
 import math
 from math import log
-# DEBUG=True
 
 def H_correct(n):
     # gamma = 0.57721566490153286060651209008240243104215933593992
@@ -25,12 +23,8 @@ def H(n):
     gamma = 0.57721566490153286060651209008240243104215933593992
     if n > 500:
         return gamma + log(n)
-        # + 0.5/n
-        # - 1./(12*n**2)
     elif n > 100:
         return gamma + log(n) + 0.5/n
-        # - 1./(12*n**2)
-        # + 1./(120*n**4)
     elif n > 0:
         return Harmonic_n[n-1]
     else:
@@ -226,87 +220,6 @@ def weighted_kendall_my(x, y, pointer, rank=None, weigher=None, tot=None, u=None
     # weights_y = weigher(rank[perm])
     return min(1., max(-1., tau)), tot, u, v, t, exchanges_weight[0], weights_x, tot - (v + u - t) - 2. * exchanges_weight[0], np.sqrt(tot - u) * np.sqrt(tot - v)
 
-def kendall_my(x, y):
-    import scipy.special as special
-
-    x = np.asarray(x).ravel()
-    y = np.asarray(y).ravel()
-
-    if x.size != y.size:
-        raise ValueError("All inputs to `kendalltau` must be of the same "
-                         f"size, found x-size {x.size} and y-size {y.size}")
-    elif not x.size or not y.size:
-        # Return NaN if arrays are empty
-        return np.nan
-
-    def count_rank_tie(ranks):
-        cnt = np.bincount(ranks).astype('int64', copy=False)
-        cnt = cnt[cnt > 1]
-        return ((cnt * (cnt - 1) // 2).sum(),
-                (cnt * (cnt - 1.) * (cnt - 2)).sum(),
-                (cnt * (cnt - 1.) * (2*cnt + 5)).sum())
-    def _kendall_dis(x, y):
-        sup = 1 + np.max(y)
-        # Use of `>> 14` improves cache performance of the Fenwick tree (see gh-10108)
-        arr = np.zeros(sup + ((sup - 1) >> 14), dtype=np.intp)
-        i = 0
-        k = 0
-        size = x.size
-        dis = 0
-
-        while i < size:
-            while k < size and x[i] == x[k]:
-                dis += i
-                idx = y[k]
-                while idx != 0:
-                    dis -= arr[idx + (idx >> 14)]
-                    idx = idx & (idx - 1)
-
-                k += 1
-
-            while i < k:
-                idx = y[i]
-                while idx < sup:
-                    arr[idx + (idx >> 14)] += 1
-                    idx += idx & -idx
-                i += 1
-
-        return dis
-
-    size = x.size
-    perm = np.argsort(y)  # sort on y and convert y to dense ranks
-    x, y = x[perm], y[perm]
-    y = np.r_[True, y[1:] != y[:-1]].cumsum(dtype=np.intp)
-
-    # stable sort on x and convert x to dense ranks
-    perm = np.argsort(x, kind='mergesort')
-    x, y = x[perm], y[perm]
-    x = np.r_[True, x[1:] != x[:-1]].cumsum(dtype=np.intp)
-
-    dis = _kendall_dis(x, y)  # discordant pairs
-
-    obs = np.r_[True, (x[1:] != x[:-1]) | (y[1:] != y[:-1]), True]
-    cnt = np.diff(np.nonzero(obs)[0]).astype('int64', copy=False)
-
-    ntie = (cnt * (cnt - 1) // 2).sum()  # joint ties
-    xtie, x0, x1 = count_rank_tie(x)     # ties in x, stats
-    ytie, y0, y1 = count_rank_tie(y)     # ties in y, stats
-
-    tot = (size * (size - 1)) // 2
-
-    if xtie == tot or ytie == tot:
-        return np.nan
-
-    # Note that tot = con + dis + (xtie - ntie) + (ytie - ntie) + ntie
-    #               = con + dis + xtie + ytie - ntie
-    con_minus_dis = tot - xtie - ytie + ntie - 2 * dis
-
-    # tau b
-    tau = con_minus_dis / np.sqrt(tot - xtie) / np.sqrt(tot - ytie)
-
-    # Limit range to fix computational errors
-    tau = min(1., max(-1., tau))
-    return tau
 
 def get_mean_square_error_split_optimal(y, X):
     """
@@ -594,26 +507,7 @@ def get_rhf_split(y, X, low_bound, total_size, epslon=0.1, select_way='k3'):
                     continue
                 k_inc = con_minus_dis_inc / n_minus_tie_inc
                 k_dec = con_minus_dis_dec / n_minus_tie_dec
-                # k_inc = (tot - (u+v_inc-t_inc) -2*exchange_inc) / np.sqrt(tot - u) / np.sqrt(tot - v_inc)
-                # k_dec = (tot - (u+v_dec-t_dec) -2*exchange_dec) / np.sqrt(tot - u) / np.sqrt(tot - v_dec)
-
-                # ### debug info
-                # concat_dec = np.concatenate((right_y_sorted, left_y_sorted), axis=None)
-                # concat_inc = np.concatenate((left_y_sorted, right_y_sorted), axis=None)
-                # k_inc_ori, tot, u, v_inc_ori, t_inc_ori, exchange_inc_ori, _, con_minus_dis_inc_ori, _ = weighted_kendall_my(y_inc, concat_inc, left_size, tot=tot, u=u)
-                # k_dec_ori, tot, u, v_dec_ori, t_dec_ori, exchange_dec_ori, _, con_minus_dis_dec_ori, _ = weighted_kendall_my(y_inc, concat_dec, right_size, tot=tot, u=u)
-
-                # print('j: %d'%j)
-                # print('===cons-dis:')
-                # print('ori: %.3f, %.3f' % (con_minus_dis_inc_ori, con_minus_dis_dec_ori))
-                # print('my: %.3f, %.3f' %(con_minus_dis_inc, con_minus_dis_dec))
-                # # print('===exchange:')
-                # # print('ori: %.3f, %.3f'%(exchange_inc_ori, exchange_dec_ori))
-                # # print('my: %.3f, %.3f'%(exchange_inc, exchange_dec))
-                # print('===kendal:')
-                # print('ori: %.3f, %.3f'%(k_inc_ori, k_dec_ori))
-                # print('my: %.3f, %.3f'%(k_inc, k_dec))
-                # import ipdb;ipdb.set_trace()
+                
             if left_size < right_size and  k_dec > k_inc and left_size > low_bound or left_size > right_size and k_dec <= k_inc and right_size > low_bound:
                 if select_way == 'k3' or select_way == 'mix':
                     if left_size_pre_star == 0:
