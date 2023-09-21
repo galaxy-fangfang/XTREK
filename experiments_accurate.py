@@ -7,7 +7,8 @@ from sklearn.metrics import average_precision_score
 import argparse
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import IsolationForest
-from size_tree.sizeRegressor_sorted_accurate import *
+from size_tree.XTREK import *
+import time
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -36,9 +37,9 @@ if __name__ == '__main__':
         if_preds = black_box.decision_function(X)
         anomalyscores = 0.5 - if_preds
         black_ap[i] = average_precision_score(y, anomalyscores)
-        import time
+        
         starttime = time.time()
-        explainer = SizeBasedRegressionTree(max_depth=20, max_nodes=64, score_way='RHF', epslon=1.)
+        explainer = SizeBasedRegressionTree(max_depth=20, max_nodes=64)
         explainer.fit(anomalyscores, X)
         counttime += time.time()-starttime
         explainer_predict = explainer.predict_train()
@@ -49,7 +50,7 @@ if __name__ == '__main__':
         reg_scores = explainer.predict(X)
         reg_ap[i] = average_precision_score(y,reg_scores)
 
-    print('IF ap: %.3f, Our ap: %.3f, CART ap: %.3f, time per run: %.3f s'%(black_ap.mean(),  size_ap.mean(), reg_ap.mean(),counttime/10))
+    print('IF ap: %.3f, XTREK ap: %.3f, CART ap: %.3f, time per run for XTREK: %.3f s'%(black_ap.mean(),  size_ap.mean(), reg_ap.mean(),counttime/10))
 
 
 
