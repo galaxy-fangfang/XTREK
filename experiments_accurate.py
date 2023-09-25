@@ -35,9 +35,9 @@ if __name__ == '__main__':
         black_box = IsolationForest()
         black_box.fit(X)
         if_preds = black_box.decision_function(X)
-        anomalyscores = 0.5 - if_preds
+        anomalyscores = 0.5 - if_preds# make sure the higher scores are more anomalous
         black_ap[i] = average_precision_score(y, anomalyscores)
-        
+
         starttime = time.time()
         explainer = SizeBasedRegressionTree(max_depth=20, max_nodes=64)
         explainer.fit(anomalyscores, X)
